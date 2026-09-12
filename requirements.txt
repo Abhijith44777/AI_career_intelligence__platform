@@ -1,0 +1,21 @@
+# --- Milestone 1: Audio Processing & Transcription ---
+streamlit>=1.32.0
+pandas>=2.0.0            # dataframe styling for the Action Items table
+openai-whisper>=20231117
+jiwer>=3.0.0
+torch>=2.0.0
+
+# --- Milestone 2: Summarization & Action Extraction ---
+# Default LLM provider is Gemini - free tier, no Anthropic key needed.
+# Set GEMINI_API_KEY (get one free at https://aistudio.google.com/apikey),
+# either as a real environment variable or in a local .env file (see
+# .env.example) - python-dotenv loads .env automatically on startup.
+python-dotenv>=1.0.0
+google-genai>=0.3.0
+anthropic>=0.34.0        # optional alternate provider (set ANTHROPIC_API_KEY env var)
+openai>=1.30.0           # optional alternate provider (set OPENAI_API_KEY env var)
+fastapi>=0.110.0
+uvicorn>=0.29.0
+python-multipart>=0.0.9  # required by FastAPI for file uploads
+# No package is required for the "local" provider / automatic fallback -
+# local_extraction.py is pure Python standard library (re, collections).
