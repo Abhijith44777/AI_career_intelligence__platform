@@ -183,6 +183,48 @@ class Database:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    # -- Milestone 3 read helpers (Task 1: granular per-field retrieval) --------
+    # Thin wrappers over the existing tables/queries above - no schema change,
+    # no duplicate storage. They exist so api.py can expose one focused
+    # endpoint per data type (GET /meetings/{id}/transcript, /decisions, etc.)
+    # without every caller having to know the join logic themselves.
+
+    def get_transcript(self, meeting_id: int) -> str:
+        meeting = self.get_meeting(meeting_id)
+        return meeting["transcript"] if meeting else None
+
+    def get_decisions(self, meeting_id: int) -> list:
+        summary = self.get_summary(meeting_id)
+        return summary["decisions"] if summary else []
+
+    def get_participants_for_meeting(self, meeting_id: int) -> list:
+        """Distinct participant names linked to this meeting via its action
+        items - the existing schema has no separate meeting<->participant
+        join table, so this reuses the same relationship Task 4 (Milestone 2)
+        already established."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT DISTINCT participants.id, participants.name
+                   FROM action_items
+                   JOIN participants ON action_items.participant_id = participants.id
+                   WHERE action_items.meeting_id = ?
+                   ORDER BY participants.name""",
+                (meeting_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_deadlines_for_meeting(self, meeting_id: int) -> list:
+        """Distinct, non-empty deadlines linked to this meeting via its
+        action items."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT DISTINCT deadline FROM action_items
+                   WHERE meeting_id = ? AND deadline IS NOT NULL AND TRIM(deadline) != ''
+                   ORDER BY deadline""",
+                (meeting_id,),
+            ).fetchall()
+            return [r["deadline"] for r in rows]
+
     # -- Full meeting read (used by API / UI) --------------------------------
 
     def get_meeting_full(self, meeting_id: int) -> dict:

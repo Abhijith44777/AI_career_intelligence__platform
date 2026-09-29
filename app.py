@@ -512,11 +512,84 @@ if st.session_state.transcript_result:
 
         st.caption(f"Saved under meeting_id `{st.session_state.meeting_id}` in `meetings.db`")
 
+# =============================================================================
+# Milestone 3 - Meeting Knowledge Repository: Semantic Search & RAG Q&A
+# =============================================================================
+st.divider()
+st.header("🔎 Historical Meeting Search")
+st.caption(
+    "Semantic search (Task 4) and RAG question answering (Task 5) over every "
+    "meeting ever processed - not just the one above."
+)
+
+search_tab, ask_tab = st.tabs(["🔍 Semantic Search", "🤖 Ask Your Meetings"])
+
+with search_tab:
+    with st.form("semantic_search_form"):
+        search_query = st.text_input(
+            "Enter your question", placeholder="e.g. Which meeting discussed the database migration?"
+        )
+        search_submitted = st.form_submit_button("Search", type="primary")
+
+    if search_submitted and search_query.strip():
+        from embedding_service import EmbeddingService
+        from vector_store import VectorStore
+        from semantic_search import semantic_search, LATENCY_TARGET_SECONDS
+
+        with st.spinner("Searching meeting history..."):
+            response = semantic_search(search_query, db=db, embedding_service=EmbeddingService(),
+                                        vector_store=VectorStore())
+
+        latency_label = f"{response.elapsed_seconds:.2f}s"
+        if response.within_latency_target:
+            st.caption(f"✅ Search completed in: {latency_label}  (target: under {LATENCY_TARGET_SECONDS:.0f}s)")
+        else:
+            st.caption(f"⚠️ Search completed in: {latency_label}  (target: under {LATENCY_TARGET_SECONDS:.0f}s)")
+
+        if not response.results:
+            st.info("No matching meetings found yet. Process a few meetings above first.")
+        for r in response.results:
+            with st.container(border=True):
+                st.markdown(f"**{r.meeting_title}**")
+                st.caption(f"Date: {r.meeting_date}  ·  Relevant content type: {r.content_type}  ·  "
+                           f"Similarity: `{r.relevance_score:.3f}`")
+                st.write(f"Relevant content: \u201c{r.matched_text}\u201d")
+
+with ask_tab:
+    st.markdown("**What would you like to know about previous meetings?**")
+    with st.form("rag_ask_form"):
+        question = st.text_input(
+            "Question", placeholder="e.g. What deadline was decided for the mobile application?",
+            label_visibility="collapsed",
+        )
+        ask_submitted = st.form_submit_button("Ask", type="primary")
+
+    if ask_submitted and question.strip():
+        from embedding_service import EmbeddingService
+        from vector_store import VectorStore
+        from rag_qa import answer_question
+
+        with st.spinner("Retrieving context and generating a grounded answer..."):
+            rag_result = answer_question(question, db=db, embedding_service=EmbeddingService(),
+                                          vector_store=VectorStore(), llm_service=LLMService())
+
+        st.markdown("### Answer")
+        st.write(rag_result.answer)
+        if rag_result.used_local_fallback:
+            st.caption("ℹ️ Answered with the local extractive fallback (no LLM key configured for Q&A).")
+        if rag_result.sources:
+            st.markdown("### Sources")
+            for s in rag_result.sources:
+                with st.container(border=True):
+                    st.markdown(f"**Meeting:** {s.filename}  ·  **Meeting ID:** {s.meeting_id}")
+                    st.caption(f"Relevant content ({s.content_type}): {s.snippet}")
+
 st.markdown(
     """
     <div class="footer-note">
         Milestone 1 · Audio Processing &amp; Transcription &nbsp;+&nbsp;
-        Milestone 2 · Summarization &amp; Action Extraction &nbsp;·&nbsp;
+        Milestone 2 · Summarization &amp; Action Extraction &nbsp;+&nbsp;
+        Milestone 3 · Knowledge Repository, Semantic Search &amp; RAG Q&amp;A &nbsp;·&nbsp;
         AI-Powered Career Intelligence Platform
     </div>
     """,

@@ -29,6 +29,7 @@ drift apart in behavior.
 """
 
 from dataclasses import dataclass, field
+import logging
 
 # Milestone 1
 from utils import (
@@ -46,6 +47,13 @@ from summarization import summarize_meeting, MeetingSummary
 from action_items import extract_and_validate_action_items
 from participants import map_participants_and_responsibilities
 from database import Database
+
+# Milestone 3
+from embedding_service import EmbeddingService
+from vector_store import VectorStore
+from knowledge_repository import index_meeting
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineError(Exception):
@@ -75,6 +83,9 @@ def process_meeting_recording(
     db: Database = None,
     llm_service: LLMService = None,
     whisper_model_size: str = "base",
+    embedding_service: EmbeddingService = None,
+    vector_store: VectorStore = None,
+    index_for_search: bool = True,
 ) -> PipelineResult:
     """
     Full Milestone 1 + Milestone 2 pipeline, matching the Task 6 flow
@@ -155,6 +166,22 @@ def process_meeting_recording(
     # so they still show up as meeting attendees.
     for participant in mapping["participants"]:
         db.get_or_create_participant(participant.name)
+
+    # --- Knowledge Repository indexing (Milestone 3, Tasks 1-3) ------------
+    # Embeddings are generated dynamically as each new meeting is processed,
+    # per Task 2's requirement. A failure here is LOGGED (not silently
+    # swallowed) but never fails the overall pipeline - a meeting that
+    # couldn't be embedded is still fully saved and usable; it just won't
+    # show up in semantic search until POST /embeddings/generate (or
+    # /embeddings/sync) is run for it.
+    if index_for_search:
+        try:
+            embedder = embedding_service or EmbeddingService()
+            store = vector_store or VectorStore()
+            chunks_indexed = index_meeting(db, meeting_id, embedder, store)
+            logger.info("Meeting %s indexed for search: %d chunks", meeting_id, chunks_indexed)
+        except Exception as e:  # noqa: BLE001 - indexing is best-effort, never blocks the core pipeline
+            logger.error("Indexing failed for meeting_id=%s: %s", meeting_id, e)
 
     return PipelineResult(
         meeting_id=meeting_id,

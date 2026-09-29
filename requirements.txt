@@ -19,3 +19,12 @@ uvicorn>=0.29.0
 python-multipart>=0.0.9  # required by FastAPI for file uploads
 # No package is required for the "local" provider / automatic fallback -
 # local_extraction.py is pure Python standard library (re, collections).
+
+# --- Milestone 3: Meeting Knowledge Repository, Semantic Search & RAG ---
+# Embeddings default to OpenAI (text-embedding-3-small, reuses the `openai`
+# package and OPENAI_API_KEY/EMBEDDING_API_KEY above); vector storage
+# defaults to ChromaDB (local, no server to run). If chromadb isn't
+# installed, or no embedding API key is set, both fall back automatically
+# to a zero-dependency local implementation - Milestone 3 never hard-fails
+# just because an optional dependency is missing.
+chromadb>=0.5.0
